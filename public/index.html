@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Audio Recording</title>
+</head>
+<body>
+    <textarea id="transcript"></textarea>
+    <button id="recordButton">Record</button>
+    
+    <script>
+       const recordButton = document.getElementById('recordButton');
+
+        let mediaRecorder;
+        let audioChunks = [];
+        let recording = false; // Indicates whether recording is in progress
+
+        recordButton.addEventListener('click', () => {
+            if (!recording) {
+                startRecording();
+                recordButton.textContent = 'Stop';
+            } else {
+                stopRecording();
+                recordButton.textContent = 'Record';
+            }
+        });
+
+        function startRecording() {
+            audioChunks = [];
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(function (stream) {
+                    mediaRecorder = new MediaRecorder(stream);
+
+                    mediaRecorder.ondataavailable = function (event) {
+                        if (event.data.size > 0) {
+                            audioChunks.push(event.data);
+                        }
+                    };
+
+                    mediaRecorder.onstart = function () {
+                        recording = true;
+                    };
+
+                    mediaRecorder.onstop = function () {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                        sendAudioData(audioBlob);
+                        recording = false;
+                    };
+
+                    mediaRecorder.start();
+                })
+                .catch(function (error) {
+                    console.error('Error accessing the microphone:', error);
+                });
+            }
+
+            function stopRecording() {
+                if (mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                }
+            }
+
+            function sendAudioData(audioBlob) {
+                const xhr = new XMLHttpRequest();
+                xhr.onload = function () {
+                    if (this.readyState === 4 && this.status === 200) {
+                        const response = JSON.parse(xhr.responseText);
+                        console.log('Server response:', response);
+                        document.getElementById('transcript').value = response.transcript;
+                    }
+                };
+                xhr.open('POST', 'http://localhost:3000/audio', true);
+                const formData = new FormData();
+                formData.append('audio_data', audioBlob);
+                xhr.send(formData);
+            }
+    </script>
+</body>
+</html>
